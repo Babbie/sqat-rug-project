@@ -123,14 +123,29 @@ test bool testArrowWithThis()
  *    Generator: Expression | Id ":" Expression
  */
  
-Expression desugar((Expression)`[ <Expression r> | <{Generator ","}+ gens> ]`) {
-	return (Expression)`(function() { 
-					   '   result = [];
-					   '   <Statement body>;
-					   '   return result;
-					   '})()`
-					   when Statement body := gensToBody(r, gens);
-} 
+Expression desugar((Expression)`[ <Expression r> | <{Generator ","}+ gens> ]`)
+	= (Expression)`(function() { 
+            	  '   result = [];
+            	  '   <Statement body>;
+            	  '   return result;
+                  '})()`
+            	  when Statement body := gensToBody(r, gens);
+
+Statement gensToBody(Expression r, {Generator ","}+ gens) 
+    = ((Statement)`result.push(<Expression r>);` | genToBlock(it, gen) | gen <- reverseGens)
+    when reverseGens := reverse([ g | g <- gens]);
+    
+Statement genToBlock(Statement inner, (Generator)`<Expression condition>`)
+    = (Statement)`if (<Expression condition>) <Statement inner>`;
+    
+Statement genToBlock(Statement inner, (Generator)`var <Id x> in <Expression collection>`)
+    = (Statement)`{
+                 '  var collection = <Expression collection>;
+                 '  for (var i = 0; i \< collection.length; i++) {
+                 '      var <Id x> = collection[i];
+                 '      <Statement inner>
+                 '  }
+                 '}`;
  
 Expression dummyExp() = (Expression)`NOT_YET_IMPLEMENTED`;
 Statement dummyStat() = (Statement)`NOT_YET_IMPLEMENTED;`;
