@@ -32,12 +32,43 @@ Bonus:
 
 */
 
+start syntax Source
+    = Line* lines Text? lastLine;
+   
+lexical Newline
+    = "\n";
+    
+syntax Line
+    = Text Newline;
+    
+lexical Text
+    = ![\n];
+
 alias SLOC = map[loc file, int sloc];
 
 SLOC sloc(loc project) {
-  SLOC result = ();
-  
-  // to be done
-  
-  return result;
+    SLOC result = ();
+    
+    top-down visit(crawl(project)) {
+        case file(loc l):
+            if (l.extension == "java") {
+                result[l] = countSLOC(l);
+            }
+    }
+    return result;
 }
+
+int countSLOC(loc file) {
+    return 12;
+}
+
+void testo(loc file) {
+    start[Source] commentless = parse(#start[Source], file);
+    top-down visit(commentless) {
+        case CommentBlocks t:
+        {
+            println("HOI: "+ t);
+        }
+    }
+}
+/* /* hoi */
