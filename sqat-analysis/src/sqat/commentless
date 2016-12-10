@@ -1,7 +1,0 @@
-public class HOI {
-    private int hoi;
-    
-    public HOI (int hoi) {
-        this.hoi = hoi;
-    }
-}

@@ -2,6 +2,7 @@ module sqat::series1::A2_McCabe
 
 import lang::java::jdt::m3::AST;
 import IO;
+import analysis::statistics::Frequency;
 
 /*
 
@@ -35,23 +36,54 @@ Bonus
 
 */
 
-set[Declaration] jpacmanASTs() = createAstsFromEclipseProject(|project://jpacman|, true); 
+set[Declaration] jpacmanASTs() = createAstsFromEclipseProject(|project://jpacman-framework|, true); 
 
 alias CC = rel[loc method, int cc];
 
 CC cc(set[Declaration] decls) {
-  CC result = {};
-  
-  // to be done
-  
-  return result;
+    CC result = {};
+    
+    visit (decls) {
+        case m:\method(_, _, _, _, Statement body): {
+            result[m@src] = calculateCC(body);
+        }
+    }   
+    
+    return result;
+}
+
+int calculateCC(Statement body) {
+    int count = 1;
+    visit (body) {
+        case s:\if(_, _): count += 1; //if, no else
+        case s:\if(_, _, _): count += 1; //else is included should this count as 2?
+        case s:\case(_): count += 1; //switch itself doesn't count
+        //case s:\defaultCase(): count += 1; should this count?
+        case s:\for(_, _, _, _): count += 1;
+        case s:\for(_, _, _): count += 1; //not sure if for without condition counts
+        case s:\foreach(_, _, _): count += 1; // ^^^^^
+        case s:\while(_, _): count += 1;
+        case s:\do(_, _): count += 1;
+        case s:\infix(_, "&&", _): count += 1; // && operator
+        case s:\infix(_, "||", _): count += 1; // || operator
+        case s:\conditional(_, _, _): count += 1; // ? : operators should this count as 2?
+        case s:\catch(_, _): count += 1;
+    }
+    
+    return count;
 }
 
 alias CCDist = map[int cc, int freq];
 
 CCDist ccDist(CC cc) {
-  // to be done
+    return distribution(cc);
 }
 
+test bool simple() {
+    return ccDist(cc({createAstFromFile(|project://sqat-analysis/src/sqat/test/simple.java|, false)})) == (1:1);
+}
 
+test bool complex(){
+    return ccDist(cc({createAstFromFile(|project://sqat-analysis/src/sqat/test/complex.java|, false)})) == (14:1);
+}
 
