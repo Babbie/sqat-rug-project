@@ -19,9 +19,13 @@ Tips
 
 Answer the following questions:
 - what is the biggest file in JPacman?
+  |project://jpacman-framework/src/main/java/nl/tudelft/jpacman/level/Level.java| (179 SLOC)
 - what is the total size of JPacman?
+  2458 SLOC
 - is JPacman large according to SIG maintainability?
+  No, as it falls under the extremely small category, which ranges from 0 to 66.000 SLOC.
 - what is the ratio between actual code and test code size?
+  main: 1901 SLOC, test: 557, ratio: ~3.4
 
 Sanity checks:
 - write tests to ensure you are correctly skipping multi-line comments
@@ -61,26 +65,35 @@ list[str] emptyStrings(list[str] lines) {
     for (str line <- lines) {
         str newLine = "";
         bool inQuotes = false;
+        bool inBlockComment = false;
         bool escape = false;
-        for (str char <- split("", line)) { //look at each character
-            if (!inQuotes) {
-                if (escape) {
+        for (int i <- [0..size(line)]) { //look at each character
+            if (inBlockComment) {
+                newLine += line[i];
+                if (i + 1 < size(line) && line[i] == "*" && line[i+1] == "/") {
+                    inBlockComment = false;
+                }
+            } else if (!inQuotes) {
+                if (i + 1 < size(line) && line[i] == "/" && line[i+1] == "*") {
+                    inBlockComment = true;
+                    newLine += line[i];
+                } else if (escape) {
                     newLine += "_";
                     escape = false;
-                } else if (char == "\\") {
+                } else if (line[i] == "\\") {
                     escape = true;
-                } else if (char == "\"") {
+                } else if (line[i] == "\"") {
                     inQuotes = true;
                     newLine += "_";
                 } else {
-                    newLine += char;
+                    newLine += line[i];
                 }
             } else {
                 if (escape) {
                     escape = false;
-                } else if (char == "\\") {
+                } else if (line[i] == "\\") {
                     escape = true;
-                } else if (char == "\"") {
+                } else if (line[i] == "\"") {
                     inQuotes = false;
                 }
             }
@@ -94,14 +107,19 @@ list[str] removeBlockComments(list[str] lines) {
     list[str] result = [];
     bool inBlock = false;
     for (str line <- lines) {
+        bool inSingleComment = false;
         bool skip = false;
         str newLine = "";
         for (int i <- [0..size(line)]) { //look at each character
-            if (skip) {
+            if (i + 1 < size(line) && line[i] == "/" && line[i+1] == "/") {
+                if (!inBlock) {
+                    newLine += line[i];
+                }
+                inSingleComment = true;
+            } else if (skip) {
                 skip = false;
-                continue;
             } else if (!inBlock) {
-                if (i + 1 < size(line) && line[i] == "/" && line[i+1] == "*") {
+                if (!inSingleComment && i + 1 < size(line) && line[i] == "/" && line[i+1] == "*") {
                     skip = true;
                     inBlock = true;
                 } else {
@@ -139,12 +157,18 @@ list[str] removeSingleComments(list[str] lines) {
 
 test bool jPacman() {
     SLOC result = sloc(|project://jpacman-framework/src|);
-    int sum = (sloc : result[sloc] | sloc <- result);
+    int sum = 0;
+    for (file <- result) {
+        sum += result[file];
+    }
     return sum == 2458;
 }
 
 test bool ourCase() {
     SLOC result = sloc(|project://sqat-analysis/src/sqat/test/comments.java|);
-    int sum = sum(result.sloc);
-    return sum == 22;
+    int sum = 0;
+    for (file <- result) {
+        sum += result[file];
+    }
+    return sum == 15;
 }

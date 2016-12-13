@@ -12,9 +12,10 @@ Construct a distribution of method cylcomatic complexity.
 
 Questions:
 - which method has the highest complexity (use the @src annotation to get a method's location)
-
+  |file:///C:/Users/Bab/git/sqat-rug-project/jpacman/src/main/java/nl/tudelft/jpacman/npc/ghost/Inky.java|(2255,2267,<68,1>,<131,17>)
+  The method nextMove in that file has a complexity of 8.
 - how does pacman fare w.r.t. the SIG maintainability McCabe thresholds?
-
+  It falls under the best possible risk category, as a complexity of 8 is still very low.
 - is code size correlated with McCabe in this case (use functions in analysis::statistics::Correlation to find out)? 
   (Background: Davy Landman, Alexander Serebrenik, Eric Bouwers and Jurgen J. Vinju. Empirical analysis 
   of the relationship between CC and SLOC in a large corpus of Java methods 
@@ -42,32 +43,38 @@ alias CC = rel[loc method, int cc];
 
 CC cc(set[Declaration] decls) {
     CC result = {};
-    
+    int max = 0;
+    loc location;
     visit (decls) {
         case m:\method(_, _, _, _, Statement body): {
-            result[m@src] = calculateCC(body);
+            int count = calculateCC(body);
+            result[m@src] = count;
+            if (max < count) {
+                max = count;
+                location = m@src;
+            }
         }
     }   
-    
+    println(max);
+    println(location);
     return result;
 }
 
 int calculateCC(Statement body) {
     int count = 1;
     visit (body) {
-        case s:\if(_, _): count += 1; //if, no else
-        case s:\if(_, _, _): count += 1; //else is included should this count as 2?
-        case s:\case(_): count += 1; //switch itself doesn't count
-        //case s:\defaultCase(): count += 1; should this count?
-        case s:\for(_, _, _, _): count += 1;
-        case s:\for(_, _, _): count += 1; //not sure if for without condition counts
-        case s:\foreach(_, _, _): count += 1; // ^^^^^
-        case s:\while(_, _): count += 1;
-        case s:\do(_, _): count += 1;
+        case s:\if(_, _): count += 1; // if, no else
+        case s:\if(_, _, _): count += 1; // if with else
+        case s:\case(_): count += 1; // switch itself doesn't count
+        case s:\for(_, _, _, _): count += 1; // for with condition
+        case s:\for(_, _, _): count += 1; // for without condition
+        case s:\foreach(_, _, _): count += 1; // foreach
+        case s:\while(_, _): count += 1; // while
+        case s:\do(_, _): count += 1; // do while
         case s:\infix(_, "&&", _): count += 1; // && operator
         case s:\infix(_, "||", _): count += 1; // || operator
-        case s:\conditional(_, _, _): count += 1; // ? : operators should this count as 2?
-        case s:\catch(_, _): count += 1;
+        case s:\conditional(_, _, _): count += 1; // ? : operators
+        case s:\catch(_, _): count += 1; // try catch
     }
     
     return count;

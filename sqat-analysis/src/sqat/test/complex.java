@@ -2,9 +2,12 @@ package sqat.test;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.*;
 
 public class complex {
 	// this class has a method with a CC of 14.
+	public int publicInt;
+	private int privateInt;
 	
 	public void complexMethod() {
 		if (true) {
@@ -42,10 +45,21 @@ public class complex {
 		try {
 			throw new Exception();
 		} catch (Exception e) {
-			
 		} finally {
 			
 		}
 		int i = true && false || true ? 0 : 1;
+	}
+	
+	protected void protectedMethod() {
+		
+	}
+	
+	void packageMethod() {
+
+	}
+	
+	private void privateMethod() {
+		
 	}
 }
