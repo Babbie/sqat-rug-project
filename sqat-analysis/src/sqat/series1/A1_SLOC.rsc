@@ -71,30 +71,30 @@ list[str] emptyStrings(list[str] lines) {
             if (inBlockComment) {
                 newLine += line[i];
                 if (i + 1 < size(line) && line[i] == "*" && line[i+1] == "/") {
-                    inBlockComment = false;
+                    inBlockComment = false; //end of comment block, quotes count again
                 }
             } else if (!inQuotes) {
                 if (i + 1 < size(line) && line[i] == "/" && line[i+1] == "*") {
-                    inBlockComment = true;
+                    inBlockComment = true; //start of comment block, just copy until end
                     newLine += line[i];
                 } else if (escape) {
-                    newLine += "_";
+                    newLine += "_"; //escape character
                     escape = false;
                 } else if (line[i] == "\\") {
-                    escape = true;
+                    escape = true; //escaping
                 } else if (line[i] == "\"") {
-                    inQuotes = true;
+                    inQuotes = true; //start of string
                     newLine += "_";
                 } else {
-                    newLine += line[i];
+                    newLine += line[i]; //outside of string, so copy
                 }
             } else {
                 if (escape) {
-                    escape = false;
+                    escape = false; //ignore escaped character
                 } else if (line[i] == "\\") {
-                    escape = true;
+                    escape = true; //escaping
                 } else if (line[i] == "\"") {
-                    inQuotes = false;
+                    inQuotes = false; //end of string
                 }
             }
         }
@@ -111,25 +111,25 @@ list[str] removeBlockComments(list[str] lines) {
         bool skip = false;
         str newLine = "";
         for (int i <- [0..size(line)]) { //look at each character
-            if (i + 1 < size(line) && line[i] == "/" && line[i+1] == "/") {
-                if (!inBlock) {
+            if (i + 1 < size(line) && line[i] == "/" && line[i+1] == "/") { //if single line comment
+                if (!inBlock) { //not in block, just copy
                     newLine += line[i];
                 }
-                inSingleComment = true;
+                inSingleComment = true; //blocks don't count in a single line comment
             } else if (skip) {
-                skip = false;
+                skip = false; //second character of block comment delimiters
             } else if (!inBlock) {
-                if (!inSingleComment && i + 1 < size(line) && line[i] == "/" && line[i+1] == "*") {
-                    skip = true;
-                    inBlock = true;
+                if (!inSingleComment, i + 1 < size(line), line[i] == "/", line[i+1] == "*") { //block start
+                    skip = true; //skip second character
+                    inBlock = true; //we're now in a comment block
                 } else {
-                    newLine += line[i];
+                    newLine += line[i]; //we're not in a comment block, so copy
                 }
             } else {
-                if (i + 1 < size(line) && line[i] == "*" && line[i+1] == "/") {
-                    skip = true;
-                    inBlock = false;
-                }
+                if (i + 1 < size(line) && line[i] == "*" && line[i+1] == "/") { //block end
+                    skip = true; //skip second character
+                    inBlock = false; //no longer in a comment block
+                }//ignore other contents of comment block
             }
         }
         result += newLine;
@@ -143,13 +143,13 @@ list[str] removeSingleComments(list[str] lines) {
         str newLine = "";
         for (int i <- [0..size(line)]) { //look at each character
             if (i + 1 < size(line) && line[i] == "/" && line[i+1] == "/") {
-                break;
+                break; //if double slashes, ignore rest of line
             } else {
                 newLine += line[i];
             }
         }
         if (trim(newLine) != "") {
-            result += newLine;
+            result += newLine; //if the trimmed result is empty, it's not a SLOC
         }
     }
     return result;

@@ -43,20 +43,11 @@ alias CC = rel[loc method, int cc];
 
 CC cc(set[Declaration] decls) {
     CC result = {};
-    int max = 0;
-    loc location;
     visit (decls) {
         case m:\method(_, _, _, _, Statement body): {
-            int count = calculateCC(body);
-            result[m@src] = count;
-            if (max < count) {
-                max = count;
-                location = m@src;
-            }
+            result[m@src] = calculateCC(body);
         }
-    }   
-    println(max);
-    println(location);
+    }
     return result;
 }
 

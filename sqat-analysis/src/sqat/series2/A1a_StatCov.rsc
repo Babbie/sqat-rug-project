@@ -45,5 +45,14 @@ Questions:
 */
 
 
-M3 jpacmanM3() = createM3FromEclipseProject(|project://jpacman|);
+M3 jpacmanM3() = createM3FromEclipseProject(|project://jpacman-framework|);
 
+alias Methods = set[loc];
+
+Methods getAllMethods(M3 m3) {
+    return methods(m3);
+}
+
+Methods getAllTestMethods(M3 m3) {
+    return { e | e <- methods(m3, ), String::contains(e.uri.path, "/src/test/") };
+}
