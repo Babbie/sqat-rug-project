@@ -1,6 +1,7 @@
 module sqat::series2::A1a_StatCov
 
 import lang::java::jdt::m3::Core;
+import Set;
 
 /*
 
@@ -44,15 +45,96 @@ Questions:
 
 */
 
+data Node
+    = package(loc location)
+    | class(loc location, bool testCode)
+    | interface(loc location, bool testCode)
+    | method(loc location, bool testCode);
+    
+data Edge
+    = definesType()
+    | definesMethod()
+    | calls(); // Since M3@methodInvocation is available to us, we do not need
+               // to make a distinction between the different types of calls;
+               // they are all available to us with precision.
+    
+alias Graph = rel[Node, Edge, Node];
 
 M3 jpacmanM3() = createM3FromEclipseProject(|project://jpacman-framework|);
+M3 jpacmanTestM3() = createM3FromDirectory(|file:///C:/Users/Bab/git/sqat-rug-project/jpacman/src/test|);
 
-alias Methods = set[loc];
-
-Methods getAllMethods(M3 m3) {
-    return methods(m3);
+num getSystemCoverage(M3 m3, M3 testm3) {
+    Graph graph = createGraph(m3, testm3);
+    set[Node] coveredMethods = collectCoveredMethods(graph);
+    num numOfDefinedMethods = 0.0;
+    num numOfCoveredMethods = 0.0;
+    
+    for (class <- classes(m3) - classes(testm3)) {
+        tuple[num defined, num covered] results = getFundamentalMetricsForClass(graph, class, coveredMethods);
+        numOfDefinedMethods = numOfDefinedMethods + results.defined;
+        numOfCoveredMethods = numOfCoveredMethods + results.covered;
+    }
+    
+    return (numOfCoveredMethods / numOfDefinedMethods) * 100;
 }
 
-Methods getAllTestMethods(M3 m3) {
-    return { e | e <- methods(m3, ), String::contains(e.uri.path, "/src/test/") };
+Graph createGraph(M3 m3, M3 testm3) {
+    Graph graph = {};
+    set[loc] packages = packages(m3);
+    set[loc] testClasses = classes(testm3);
+    set[loc] classes = classes(m3);
+    set[loc] testInterfaces = interfaces(testm3);
+    set[loc] interfaces = interfaces(m3);
+    set[loc] testMethods = methods(testm3);
+    set[loc] methods = methods(m3);
+    
+    rel[loc, loc] contains = m3@containment +;
+    
+    for (<parent, child> <- contains) {
+        if (parent in packages) {
+            if (child in classes) {
+                graph = graph + <package(parent), definesType(), class(child, child in testClasses)>;
+            } else if (child in interfaces) {
+                graph = graph + <package(parent), definesType(), interface(child, child in testInterfaces)>;
+            }
+        } else if (child in methods) {
+            if (parent in classes) {
+                graph = graph + <class(parent, parent in testClasses), definesMethod(), method(child, child in testMethods)>;
+            } else if (parent in interfaces) {
+                graph = graph + <interface(parent, parent in testClasses), definesMethod(), method(child, child in testMethods)>;
+            }
+        }
+    }
+    
+    for (<caller, callee> <- m3@methodInvocation) {
+        if (isConstructor(caller)) {
+            set[loc] callerClasses = {c | c <- (classes + interfaces), [c, caller] in m3@containment};
+            for (callerClass <- callerClasses) { //Should be only one
+                if (callerClass in classes) {
+                    graph = graph + <class(callerClass, callerClass in testClasses), calls(), method(callee, callee in testMethods)>;
+                } else {
+                    graph = graph + <interface(callerClass, callerClass in testInterfaces), calls(), method(callee, callee in testMethods)>;
+                }
+            }
+        } else {
+            graph = graph + <method(caller, caller in testMethods), calls(), method(callee, callee in testMethods)>;
+        }
+    }
+    
+    return graph;
+}
+
+set[Node] collectCoveredMethods(Graph graph) {
+    set[Node] coveredNodes = {initialNodes | <initialNodes, _, _> <- graph, !initialNodes is package, initialNodes.testCode};
+    solve(coveredNodes) {
+        coveredNodes = coveredNodes + {newNode | <oldNode, edge, newNode> <- graph, oldNode in coveredNodes, edge is calls};
+        coveredNodes = coveredNodes + {class | <class, edge, containedMethod> <- graph, containedMethod in coveredNodes, edge is definesMethod};
+    }
+    
+    return {coveredNode | coveredNode <- coveredNodes, coveredNode is method};
+}
+
+tuple[num, num] getFundamentalMetricsForClass(Graph graph, loc classLoc, set[Node] coveredMethods) {
+    return <size({definedMethod | <class, edge, definedMethod> <- graph, edge is definesMethod, class.location == classLoc}),
+            size({coveredMethod | <class, edge, coveredMethod> <- graph, edge is definesMethod, class.location == classLoc, coveredMethod in coveredMethods})>;
 }
