@@ -27,6 +27,13 @@ Make sure that at least one of them is violated (perhaps by
 first introducing the violation).
 
 Explain why your rule encodes "good" design.
+
+    Logic component does not depend on GUI component
+    nl.tudelft.jpacman.game.Game cannot depend nl.tudelft.jpacman.ui.PacManUI
+    Facotry pattern used correctly
+    nl.tudelft.jpacman.game.GameFactory must instantiate nl.tudelft.jpacman.game.Game
+    Correct use of abstract classes
+    nl.tudelft.jpacman.game.SinglePlayerGame must inherit nl.tudelft.jpacman.game.Game
   
 Part 2:  
  
@@ -55,11 +62,15 @@ Tip:
 
 Questions
 - how would you test your evaluator of Dicto rules? (sketch a design)
+
+    Run it on multiple programs and compare your results to results of other programs specialized in checking 
+    architectural conformity.
 - come up with 3 rule types that are not currently supported by this version
-  of Dicto (and explain why you'd need them). 
-  1: Only can would be nice. This way you could specify that only LevelFactory can instantiate Factory
-  2: contain dead methods. So you could say that if there are dead methods in test it is not important otherwise it is
-  3: Contain empty catch block. Give warning when there is an empty catch block in production code
+      of Dicto (and explain why you'd need them). 
+      
+      1: Only can would be nice. This way you could specify that only LevelFactory can instantiate Factory
+      2: Contain dead methods. So you could say that if there are dead methods in test it is not important otherwise it is
+      3: Contain empty catch block. Give warning when there is an empty catch block in production code
 */
 
 
