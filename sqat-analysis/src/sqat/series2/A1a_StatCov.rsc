@@ -54,9 +54,9 @@ data Node
 data Edge
     = definesType()
     | definesMethod()
-    | calls(); // Since M3@methodInvocation is available to us, we do not need
-               // to make a distinction between the different types of calls;
-               // they are all available to us with precision.
+    | calls()
+    | virtualCalls();
+    // overloading calls not needed, rascal covers this for us
     
 alias Graph = rel[Node, Edge, Node];
 
@@ -78,6 +78,17 @@ num getSystemCoverage(M3 m3, M3 testm3) {
     return (numOfCoveredMethods / numOfDefinedMethods) * 100;
 }
 
+num getClassCoverage(M3 m3, M3 testm3, loc class) {
+    Graph graph = createGraph(m3, testm3);
+    set[Node] coveredMethods = collectCoveredMethods(graph);
+
+    tuple[num defined, num covered] results = getFundamentalMetricsForClass(graph, class, coveredMethods);
+    num numOfDefinedMethods = results.defined;
+    num numOfCoveredMethods = results.covered;
+    
+    return numOfDefinedMethods == 0 ? 100 : (numOfCoveredMethods / numOfDefinedMethods) * 100;
+}
+
 Graph createGraph(M3 m3, M3 testm3) {
     Graph graph = {};
     set[loc] packages = packages(m3);
@@ -89,6 +100,8 @@ Graph createGraph(M3 m3, M3 testm3) {
     set[loc] methods = methods(m3);
     
     rel[loc, loc] contains = m3@containment +;
+    rel[loc, loc] overrides = m3@methodOverrides +;
+    
     
     for (<parent, child> <- contains) {
         if (parent in packages) {
@@ -112,12 +125,18 @@ Graph createGraph(M3 m3, M3 testm3) {
             for (callerClass <- callerClasses) { //Should be only one
                 if (callerClass in classes) {
                     graph = graph + <class(callerClass, callerClass in testClasses), calls(), method(callee, callee in testMethods)>;
+                    graph = graph + {<class(callerClass, callerClass in testClasses), virtualCalls(), method(overridingMethod, overridingMethod in testMethods)> 
+                                    | <overridingMethod, overriddenMethod> <- overrides, overriddenMethod == callee};
                 } else {
                     graph = graph + <interface(callerClass, callerClass in testInterfaces), calls(), method(callee, callee in testMethods)>;
+                    graph = graph + {<interface(callerClass, callerClass in testInterfaces), virtualCalls(), method(overridingMethod, overridingMethod in testMethods)> 
+                                    | <overridingMethod, overriddenMethod> <- overrides, overriddenMethod == callee};
                 }
             }
         } else {
             graph = graph + <method(caller, caller in testMethods), calls(), method(callee, callee in testMethods)>;
+            graph = graph + {<method(caller, caller in testMethods), virtualCalls(), method(overridingMethod, overridingMethod in testMethods)> 
+                            | <overridingMethod, overriddenMethod> <- overrides, overriddenMethod == callee};
         }
     }
     
@@ -127,7 +146,7 @@ Graph createGraph(M3 m3, M3 testm3) {
 set[Node] collectCoveredMethods(Graph graph) {
     set[Node] coveredNodes = {initialNodes | <initialNodes, _, _> <- graph, !initialNodes is package, initialNodes.testCode};
     solve(coveredNodes) {
-        coveredNodes = coveredNodes + {newNode | <oldNode, edge, newNode> <- graph, oldNode in coveredNodes, edge is calls};
+        coveredNodes = coveredNodes + {newNode | <oldNode, edge, newNode> <- graph, oldNode in coveredNodes, edge is calls || edge is virtualCalls};
         coveredNodes = coveredNodes + {class | <class, edge, containedMethod> <- graph, containedMethod in coveredNodes, edge is definesMethod};
     }
     
