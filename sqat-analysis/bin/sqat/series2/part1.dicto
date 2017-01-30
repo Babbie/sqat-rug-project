@@ -1,0 +1,3 @@
+nl.tudelft.jpacman.game.Game cannot depend nl.tudelft.jpacman.ui.PacManUI
+nl.tudelft.jpacman.game.GameFactory must instantiate nl.tudelft.jpacman.game.Game
+nl.tudelft.jpacman.game.SinglePlayerGame must inherit nl.tudelft.jpacman.game.Game
