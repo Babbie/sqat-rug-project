@@ -39,8 +39,15 @@ Tips
 
 Questions:
 - what methods are not covered at all?
+A whole bunch, execute getNonCoveredMethods(jpacmanM3(), jpacmanTestM3()); to find out
 - how do your results compare to the jpacman results in the paper? Has jpacman improved?
+Both our static coverage and Clover's coverage have gotten lower.
+Static went from 84.53 to 72.84 and Clover went from 9.61 to 74.8.
 - use a third-party coverage tool (e.g. Clover) to compare your results to (explain differences)
+Our static analysis resulted in a system-wide coverage of 72.84%, while clover reports 74,8% coverage.
+This seems correct, as our coverage tool does not look what parts of code within methods are covered and simply
+assumes it's all covered if the method is called, but Clover seems to register methods that aren't actually covered
+(see Inky#nextMove());
 
 
 */
@@ -62,6 +69,14 @@ alias Graph = rel[Node, Edge, Node];
 
 M3 jpacmanM3() = createM3FromEclipseProject(|project://jpacman-framework|);
 M3 jpacmanTestM3() = createM3FromDirectory(|file:///C:/Users/Bab/git/sqat-rug-project/jpacman/src/test|);
+
+set[loc] getNonCoveredMethods(M3 m3, M3 testm3) {
+    Graph graph = createGraph(m3, testm3);
+    set[Node] coveredMethods = collectCoveredMethods(graph);
+    set[loc] nonCoveredMethods = (methods(m3) - methods(testm3)) - {coveredMethod.location | coveredMethod <- coveredMethods};
+
+    return nonCoveredMethods;
+}
 
 num getSystemCoverage(M3 m3, M3 testm3) {
     Graph graph = createGraph(m3, testm3);
@@ -86,11 +101,13 @@ num getClassCoverage(M3 m3, M3 testm3, loc class) {
     num numOfDefinedMethods = results.defined;
     num numOfCoveredMethods = results.covered;
     
+    // divide by 0 means it's technically all covered, since there is nothing
     return numOfDefinedMethods == 0 ? 100 : (numOfCoveredMethods / numOfDefinedMethods) * 100;
 }
 
 Graph createGraph(M3 m3, M3 testm3) {
     Graph graph = {};
+    // get data from m3s
     set[loc] packages = packages(m3);
     set[loc] testClasses = classes(testm3);
     set[loc] classes = classes(m3);
@@ -99,21 +116,25 @@ Graph createGraph(M3 m3, M3 testm3) {
     set[loc] testMethods = methods(testm3);
     set[loc] methods = methods(m3);
     
+    // transitive closures
     rel[loc, loc] contains = m3@containment +;
     rel[loc, loc] overrides = m3@methodOverrides +;
-    
     
     for (<parent, child> <- contains) {
         if (parent in packages) {
             if (child in classes) {
+                // package definesType class
                 graph = graph + <package(parent), definesType(), class(child, child in testClasses)>;
             } else if (child in interfaces) {
+                // package definesType interface
                 graph = graph + <package(parent), definesType(), interface(child, child in testInterfaces)>;
             }
         } else if (child in methods) {
             if (parent in classes) {
+                // class definesMethod method
                 graph = graph + <class(parent, parent in testClasses), definesMethod(), method(child, child in testMethods)>;
             } else if (parent in interfaces) {
+                // interface definesMethod method
                 graph = graph + <interface(parent, parent in testClasses), definesMethod(), method(child, child in testMethods)>;
             }
         }
@@ -124,17 +145,23 @@ Graph createGraph(M3 m3, M3 testm3) {
             set[loc] callerClasses = {c | c <- (classes + interfaces), [c, caller] in m3@containment};
             for (callerClass <- callerClasses) { //Should be only one
                 if (callerClass in classes) {
+                    // constructor calls method -> class calls method
                     graph = graph + <class(callerClass, callerClass in testClasses), calls(), method(callee, callee in testMethods)>;
+                    // class calls all methods that override method
                     graph = graph + {<class(callerClass, callerClass in testClasses), virtualCalls(), method(overridingMethod, overridingMethod in testMethods)> 
                                     | <overridingMethod, overriddenMethod> <- overrides, overriddenMethod == callee};
                 } else {
+                    // constructor calls method -> interface calls method
                     graph = graph + <interface(callerClass, callerClass in testInterfaces), calls(), method(callee, callee in testMethods)>;
+                    // interface calls all methods that override method
                     graph = graph + {<interface(callerClass, callerClass in testInterfaces), virtualCalls(), method(overridingMethod, overridingMethod in testMethods)> 
                                     | <overridingMethod, overriddenMethod> <- overrides, overriddenMethod == callee};
                 }
             }
         } else {
+            // method calls method
             graph = graph + <method(caller, caller in testMethods), calls(), method(callee, callee in testMethods)>;
+            // method calls all methods that override method
             graph = graph + {<method(caller, caller in testMethods), virtualCalls(), method(overridingMethod, overridingMethod in testMethods)> 
                             | <overridingMethod, overriddenMethod> <- overrides, overriddenMethod == callee};
         }
@@ -144,12 +171,17 @@ Graph createGraph(M3 m3, M3 testm3) {
 }
 
 set[Node] collectCoveredMethods(Graph graph) {
-    set[Node] coveredNodes = {initialNodes | <initialNodes, _, _> <- graph, !initialNodes is package, initialNodes.testCode};
+    // initialize coveredNodes to all test methods via package
+    set[Node] coveredNodes = {initialNode | <packageNode, edge, initialNode> <- graph, packageNode is package, edge is definesType, initialNode.testCode};
+    coveredNodes = {methodNode | <classNode, edge, methodNode> <- graph, edge is definesMethod, classNode in coveredNodes};
     solve(coveredNodes) {
+        // add all nodes reachable through calls or virtualCalls
         coveredNodes = coveredNodes + {newNode | <oldNode, edge, newNode> <- graph, oldNode in coveredNodes, edge is calls || edge is virtualCalls};
+        // add all classes/interfaces whose methods are covered
         coveredNodes = coveredNodes + {class | <class, edge, containedMethod> <- graph, containedMethod in coveredNodes, edge is definesMethod};
     }
     
+    // return only methods, not classes or interfaces
     return {coveredNode | coveredNode <- coveredNodes, coveredNode is method};
 }
 
